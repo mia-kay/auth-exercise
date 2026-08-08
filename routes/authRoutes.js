@@ -86,6 +86,15 @@ router.post(
     });
 }
 
+// POST /auth/logout
+router.post("/logout", (req, res) => {
+    res.clearCookie("token");
+
+    res.status(200).json({
+        message: "Logout successful"
+    });
+});
+
 // GET /auth/me - Protected route
 router.get("/me", authenticate, async (req, res) => {
     try {
@@ -114,6 +123,12 @@ const token = jwt.sign(
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN }
 );
+
+res.cookie("token", token, {
+    httpOnly: true
+});
+
+
 
 // Return token and basic user information
 res.status(200).json({
