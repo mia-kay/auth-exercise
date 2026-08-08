@@ -1,6 +1,8 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const User = require("../models/User");
+const jwt = require("jsonwebtoken");
+const authenticate = require("../middleware/authenticate");
 
 const {
     signupValidation,
@@ -78,11 +80,51 @@ router.post(
                 user.password
             );
 
-            if (!passwordMatch) {
-                return res.status(400).json({
-                    error: "Invalid email or password"
-                });
-            }
+           if (!passwordMatch) {
+    return res.status(400).json({
+        error: "Invalid email or password"
+    });
+}
+
+// GET /auth/me - Protected route
+router.get("/me", authenticate, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId)
+            .select("-password");
+
+        if (!user) {
+            return res.status(404).json({
+                error: "User not found"
+            });
+        }
+
+        res.status(200).json(user);
+
+    } catch (error) {
+        res.status(500).json({
+            error: error.message
+        });
+    }
+});
+
+
+// Create JWT
+const token = jwt.sign(
+    { userId: user._id },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN }
+);
+
+// Return token and basic user information
+res.status(200).json({
+    message: "Sign in successful",
+    token,
+    user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email
+    }
+});
 
             // Return basic user information without password
             res.status(200).json({
