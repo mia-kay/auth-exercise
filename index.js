@@ -5,18 +5,23 @@ dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 const express = require("express");
 const mongoose = require("mongoose");
+const cors = require("cors");
 
 const authRoutes = require("./routes/authRoutes");
 const cookieParser = require("cookie-parser");
 
 
 const app = express();
+app.use(cors({
+    origin: "http://localhost:5174",
+    credentials: true
+}));
 app.use(cookieParser());
 app.use(express.json());
 
 app.use("/auth", authRoutes);  
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 mongoose.connect(process.env.MONGO_URI_DIRECT, {
     family: 4
