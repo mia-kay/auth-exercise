@@ -12,12 +12,11 @@ const {
 
 const router = express.Router();
 
-// POST /auth/signup
 router.post(
     "/signup",
     signupValidation,
     handleValidationErrors,
-    async (req, res) => {
+    async (req, res, next) => {
         try {
             const { name, email, password } = req.body;
 
@@ -25,7 +24,11 @@ router.post(
 
             if (existingUser) {
                 return res.status(400).json({
-                    error: "Email already registered"
+                    success: false,
+                    error: {
+                        code: "EMAIL_ALREADY_REGISTERED",
+                        message: "This email is already registered."
+                    }
                 });
             }
 
@@ -37,34 +40,44 @@ router.post(
                 password: hashedPassword
             });
 
-            res.status(201).json({
+            return res.status(201).json({
                 _id: user._id,
                 name: user.name,
                 email: user.email
             });
-
         } catch (error) {
-            res.status(400).json({
-                error: error.message
-            });
+            if (error.code === 11000) {
+                return res.status(400).json({
+                    success: false,
+                    error: {
+                        code: "EMAIL_ALREADY_REGISTERED",
+                        message: "This email is already registered."
+                    }
+                });
+            }
+
+            return next(error);
         }
     }
 );
 
-// POST /auth/signin
 router.post(
     "/signin",
     signinValidation,
     handleValidationErrors,
-    async (req, res) => {
+    async (req, res, next) => {
         try {
             const { email, password } = req.body;
 
             const user = await User.findOne({ email });
 
             if (!user) {
-                return res.status(400).json({
-                    error: "Invalid email or password"
+                return res.status(401).json({
+                    success: false,
+                    error: {
+                        code: "INVALID_CREDENTIALS",
+                        message: "Invalid email or password."
+                    }
                 });
             }
 
@@ -74,8 +87,12 @@ router.post(
             );
 
             if (!passwordMatch) {
-                return res.status(400).json({
-                    error: "Invalid email or password"
+                return res.status(401).json({
+                    success: false,
+                    error: {
+                        code: "INVALID_CREDENTIALS",
+                        message: "Invalid email or password."
+                    }
                 });
             }
 
@@ -86,10 +103,12 @@ router.post(
             );
 
             res.cookie("token", token, {
-                httpOnly: true
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
             });
 
-            res.status(200).json({
+            return res.status(200).json({
                 message: "Sign in successful",
                 token,
                 user: {
@@ -98,42 +117,42 @@ router.post(
                     email: user.email
                 }
             });
-
         } catch (error) {
-            res.status(400).json({
-                error: error.message
-            });
+            return next(error);
         }
     }
 );
 
-// POST /auth/logout
 router.post("/logout", (req, res) => {
-    res.clearCookie("token");
+    res.clearCookie("token", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax"
+    });
 
-    res.status(200).json({
+    return res.status(200).json({
         message: "Logout successful"
     });
 });
 
-// GET /auth/me - Protected route
-router.get("/me", authenticate, async (req, res) => {
+router.get("/me", authenticate, async (req, res, next) => {
     try {
         const user = await User.findById(req.user.userId)
             .select("-password");
 
         if (!user) {
             return res.status(404).json({
-                error: "User not found"
+                success: false,
+                error: {
+                    code: "USER_NOT_FOUND",
+                    message: "User not found."
+                }
             });
         }
 
-        res.status(200).json(user);
-
+        return res.status(200).json(user);
     } catch (error) {
-        res.status(500).json({
-            error: error.message
-        });
+        return next(error);
     }
 });
 
